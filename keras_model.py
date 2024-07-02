@@ -7,33 +7,45 @@ from soft_dtw_cuda import _SoftDTW
 from sleep_impl_frechet import _SoftFrechet
 from _dataloader import PenTrackerDataset
 from torch.utils.data import DataLoader, random_split
+from pytorch_tcn import TCN
 
 # sz = 100
 # dataset_size = 1000
 # inputs, outputs, theta2 = gen_folium_dataset(dataset_size, sz)
 # print(inputs.shape, outputs.shape)
 
-dataset = PenTrackerDataset()
+# dataset = PenTrackerDataset()
 
-train, test = random_split(dataset, [100, 35])
-dataloader = DataLoader(train, batch_size=10, shuffle=True)
+# train, test = random_split(dataset, [100, 35])
+# dataloader = DataLoader(train, batch_size=10, shuffle=True)
 
 
 model = keras.models.Sequential(
     [
-        keras.layers.InputLayer(shape=(None, 13)),
-        keras.layers.Concatenate(axis=-1),
-        
-        # keras.layers.Conv1D(2, 3, padding ='same'),
-        keras.layers.Dense(2),
-        # keras.layers.Dense(50, activation='relu'),
-        # keras.layers.Dense(100, activation='relu'),
+        keras.layers.InputLayer(shape=(None, 10)),
+        TCN(num_inputs=10,
+                num_channels=[256] * 4,
+                kernel_size=3,
+                dilations=None, # TODO
+                causal=False,
+                dropout=0.2,
+                use_norm="batch_norm",
+        ),
+        keras.layers.Dense(50),
+        keras.layers.BatchNormalization(),
+        keras.layers.Dense(2)
     ]
 )
+model.summary()
+exit()
 
-def my_loss(x, y, gamma = 0.01):
+def my_loss(x, y, gamma = 0.01, type='dtw'):
     dists = torch.cdist(x, y)
-    return _SoftFrechet.apply(dists, gamma)
+    if type == 'frechet':
+        return _SoftFrechet.apply(dists, gamma)
+    elif type == 'dtw':
+        return _SoftDTW.apply(dists, gamma)
+
 
 model.compile(optimizer='adam', loss=my_loss)
 model.summary()
