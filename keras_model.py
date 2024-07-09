@@ -1,29 +1,42 @@
 import os
 os.environ["KERAS_BACKEND"] = "torch"
 
-import keras
 import torch
+import keras
 from soft_dtw_cuda import _SoftDTW
 from sleep_impl_frechet import _SoftFrechet
 from _dataloader import PenTrackerDataset
 from torch.utils.data import DataLoader, random_split
 from pytorch_tcn import TCN
+from keras.src.utils.torch_utils import TorchModuleWrapper
 
 # sz = 100
 # dataset_size = 1000
 # inputs, outputs, theta2 = gen_folium_dataset(dataset_size, sz)
 # print(inputs.shape, outputs.shape)
 
-# dataset = PenTrackerDataset()
 
-# train, test = random_split(dataset, [100, 35])
-# dataloader = DataLoader(train, batch_size=10, shuffle=True)
+# doc TCN
+# https://github.com/paul-krug/pytorch-tcn
 
+
+class myTCN(keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.tcn = TCN(**kwargs)
+    
+    def call(self, x):
+        x = x.transpose(1, 2)
+        return self.tcn.call(x).transpose(1, 2)
+    
+    def compute_output_shape(self, input_shape):
+        return input_shape[0], None, 256
 
 model = keras.models.Sequential(
     [
         keras.layers.InputLayer(shape=(None, 10)),
-        TCN(num_inputs=10,
+
+        myTCN(num_inputs=10,
                 num_channels=[256] * 4,
                 kernel_size=3,
                 dilations=None, # TODO
@@ -36,10 +49,9 @@ model = keras.models.Sequential(
         keras.layers.Dense(2)
     ]
 )
-model.summary()
-exit()
 
 def my_loss(x, y, gamma = 0.01, type='dtw'):
+    # print(x.shape, y.shape)
     dists = torch.cdist(x, y)
     if type == 'frechet':
         return _SoftFrechet.apply(dists, gamma)
@@ -51,9 +63,13 @@ model.compile(optimizer='adam', loss=my_loss)
 model.summary()
 
 
-model.fit(inputs, outputs, epochs=10, batch_size=10)
+dataset = PenTrackerDataset()
+train, test = random_split(dataset, [100, 35])
+dataloader = DataLoader(train, batch_size=10, shuffle=True, collate_fn=dataset.collate_fn)
+
+model.fit(dataloader, epochs=10, batch_size=10)
 # pickle.dump(model, open('model.pkl', 'wb'))
-preds = model.predict(inputs)
+# preds = model.predict(inputs)
 
 
 # import matplotlib.pyplot as plt

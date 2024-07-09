@@ -118,7 +118,7 @@ class _SoftDTWCUDA(Function):
     """
 
     @staticmethod
-    def forward(ctx, D, gamma, bandwidth):
+    def forward(ctx, D, gamma, bandwidth=5):
         dev = D.device
         dtype = D.dtype
         gamma = torch.tensor([gamma], dtype=torch.float32, device='cuda')
@@ -245,7 +245,7 @@ class _SoftDTW(Function):
     """
 
     @staticmethod
-    def forward(ctx, D, gamma, bandwidth):
+    def forward(ctx, D, gamma, bandwidth=5):
         dev = D.device
         dtype = D.dtype
         gamma = torch.Tensor([gamma]).to(dev).type(dtype)  # dtype fixed
